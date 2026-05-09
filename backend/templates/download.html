@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download {{ filename }} — TempShare</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body class="download-page">
+
+    <div class="download-card">
+        <div class="file-icon-large">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 18 15 15"></polyline></svg>
+        </div>
+
+        <div class="file-name">{{ filename }}</div>
+
+        <div class="downloads-left {% if downloads_left == 1 %}urgent{% endif %}" id="downloads-badge">
+            <span id="dl-count">{{ downloads_left }}</span> download{% if downloads_left != 1 %}s{% endif %} remaining
+        </div>
+
+        {% if content_type.startswith('video/') %}
+        <div id="media-container" style="display: none; margin-top: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden; background: #000;">
+            <video id="media-player" controls style="width: 100%; max-height: 400px;"></video>
+        </div>
+        <button id="download-btn" class="download-btn" onclick="fetchMediaAndPlay('video')">
+            Play Video Securely
+        </button>
+        {% elif content_type.startswith('image/') %}
+        <div id="media-container" style="display: none; margin-top: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden; background: #000; justify-content: center;">
+            <img id="media-player" style="max-width: 100%; max-height: 400px; object-fit: contain;">
+        </div>
+        <button id="download-btn" class="download-btn" onclick="fetchMediaAndPlay('image')">
+            View Image Securely
+        </button>
+        {% elif content_type.startswith('audio/') %}
+        <div id="media-container" style="display: none; margin-top: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden; background: var(--bg-input); padding: 1rem;">
+            <audio id="media-player" controls style="width: 100%;"></audio>
+        </div>
+        <button id="download-btn" class="download-btn" onclick="fetchMediaAndPlay('audio')">
+            Play Audio Securely
+        </button>
+        {% else %}
+        <button id="download-btn" class="download-btn" onclick="triggerDownload()">
+            Download Securely
+        </button>
+        {% endif %}
+
+        <div id="processing-view" class="hidden" style="margin-top: 2rem;">
+            <div style="height: 6px; border-radius: 3px; background: var(--bg-input); overflow: hidden; margin-bottom: 1rem; border: 1px solid var(--border);">
+                <div style="height: 100%; width: 100%; background: var(--accent-gradient); border-radius: 3px; animation: progress-pulse 1.5s ease infinite;"></div>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; font-weight: 500;">Decrypting & preparing your file...</p>
+        </div>
+
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 2.5rem; font-weight: 500;">
+            TempShare — Secure temporary file sharing
+        </p>
+    </div>
+
+    <style>
+        @keyframes progress-pulse {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
+
+    <script>
+        // Use default dark theme for download page if not set
+        if (!localStorage.getItem('tempshare-theme')) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else if (localStorage.getItem('tempshare-theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+
+        function triggerDownload() {
+            const btn = document.getElementById('download-btn');
+            const processingView = document.getElementById('processing-view');
+            const dlCount = document.getElementById('dl-count');
+            const badge = document.getElementById('downloads-badge');
+
+            btn.classList.add('hidden');
+            processingView.classList.remove('hidden');
+
+            const a = document.createElement('a');
+            a.href = "/api/download/{{ short_id }}";
+            a.click();
+
+            setTimeout(() => {
+                updateCounter(dlCount, badge, processingView, btn);
+            }, 2000);
+        }
+
+        async function fetchMediaAndPlay(type) {
+            const btn = document.getElementById('download-btn');
+            const processingView = document.getElementById('processing-view');
+            const dlCount = document.getElementById('dl-count');
+            const badge = document.getElementById('downloads-badge');
+            
+            btn.classList.add('hidden');
+            processingView.classList.remove('hidden');
+
+            try {
+                const response = await fetch("/api/download/{{ short_id }}");
+                if (!response.ok) throw new Error("Failed to decrypt");
+                
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                
+                processingView.classList.add('hidden');
+                
+                const container = document.getElementById('media-container');
+                const player = document.getElementById('media-player');
+                player.src = blobUrl;
+                container.style.display = type === 'image' ? 'flex' : 'block';
+                
+                if (type === 'video' || type === 'audio') {
+                    player.play().catch(e => console.log('Autoplay prevented:', e));
+                }
+                
+                btn.textContent = 'Save Copy to Device';
+                btn.classList.remove('hidden');
+                btn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = "{{ filename }}";
+                    a.click();
+                };
+
+                updateCounter(dlCount, badge, processingView, btn, true);
+            } catch(e) {
+                processingView.innerHTML = `<p style="color:var(--error); font-weight: bold;">Error loading media or link expired.</p>`;
+            }
+        }
+
+        function updateCounter(dlCount, badge, processingView, btn, isMedia = false) {
+            let current = parseInt(dlCount.innerText);
+            if(current > 0) current--;
+            dlCount.innerText = current;
+
+            if (current === 1) {
+                badge.classList.add('urgent');
+                badge.innerHTML = '<span id="dl-count">1</span> download remaining';
+            }
+
+            if(current === 0) {
+                if (!isMedia) {
+                    processingView.innerHTML = `
+                        <div style="background: var(--error-bg); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius-sm); padding: 1.5rem; animation: slideUp 0.4s ease;">
+                            <p style="color: var(--error); font-weight: 800; font-size: 1.2rem; margin-bottom: 0.5rem;">Link Expired</p>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 500;">This file has self-destructed and is no longer available.</p>
+                        </div>
+                    `;
+                    processingView.classList.remove('hidden');
+                }
+                badge.style.display = 'none';
+            } else if (!isMedia) {
+                btn.textContent = 'Download Again';
+                btn.classList.remove('hidden');
+                processingView.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

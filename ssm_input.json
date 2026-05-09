@@ -1,0 +1,19 @@
+{
+    "DocumentName": "AWS-RunShellScript",
+    "Targets": [
+        {
+            "Key": "tag:Name",
+            "Values": [
+                "clouddrop-app-server-1",
+                "clouddrop-app-server-2"
+            ]
+        }
+    ],
+    "Parameters": {
+        "commands": [
+            "aws s3 cp s3://clouddrop-deploy-556684850112/clouddrop-app.zip /tmp/clouddrop-app.zip",
+            "unzip -o /tmp/clouddrop-app.zip -d /opt/clouddrop",
+            "systemctl restart clouddrop"
+        ]
+    }
+}

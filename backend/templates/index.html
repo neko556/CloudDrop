@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TempShare — Secure temporary file sharing. Upload, share, auto-delete.">
+    <title>TempShare — Temporary File Sharing</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+<div class="bg-wave"></div>
+<div class="toast-container" id="toast-container"></div>
+
+<div class="split-layout">
+    <!-- ── Left Column (Hero) ──────────────────────────────── -->
+    <div class="left-pane">
+        <header class="header">
+            <div class="header-top">
+                <h1 class="logo">TempShare</h1>
+                <div class="auth-area">
+                    {% if cognito_enabled %}
+                    {% if user_email %}
+                    <span class="user-badge" title="{{ user_email }}">{{ user_email.split('@')[0] }}</span>
+                    <button class="auth-btn logout-btn" id="logout-btn" onclick="doLogout()">Logout</button>
+                    {% else %}
+                    <button class="auth-btn login-btn" id="login-btn" onclick="showAuthModal()">Sign In</button>
+                    {% endif %}
+                    {% endif %}
+                    <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+                        <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+                        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+                    </button>
+                </div>
+        </header>
+
+        <div class="features-list" style="display: none;">
+            <div class="feature-item">
+                <span class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </span>
+                <div class="feature-text">
+                    <h4>End-to-End Encrypted</h4>
+                    <p>Files are encrypted in your browser before upload.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </span>
+                <div class="feature-text">
+                    <h4>Auto-Destruct</h4>
+                    <p>Links expire automatically after 24 hours.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                </span>
+                <div class="feature-text">
+                    <h4>Blazing Fast</h4>
+                    <p>Instant multi-file zipping and global CDN delivery.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Right Column (App) ──────────────────────────────── -->
+    <div class="right-pane">
+        <div class="app-container">
+
+    <!-- ── Tab Navigation (only for logged-in users) ──────── -->
+    {% if user_email %}
+    <div class="tab-nav" id="tab-nav">
+        <button class="tab-btn active" data-tab="upload">Upload</button>
+        <button class="tab-btn" data-tab="my-uploads">My Files</button>
+    </div>
+    {% endif %}
+
+    <!-- ── Upload Card ─────────────────────────────────────── -->
+    <div class="card tab-content" id="upload-card" data-tab="upload">
+
+        <!-- Drop Zone -->
+        
+        <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 2.5rem; width: 100%;">
+            <!-- Dropzone Button -->
+            <div class="dropzone-circle" id="dropzone" tabindex="0" style="cursor: pointer; width: 80px; height: 80px; border-radius: 50%; background: transparent; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; transition: all var(--transition);">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <input type="file" id="file-input" hidden multiple>
+            </div>
+            
+            <!-- Upload Button (Perfect Gradient Border) -->
+            <button class="upload-btn-circle" id="upload-btn" disabled style="width: 84px; height: 84px; border-radius: 50%; background: var(--accent-gradient); padding: 3px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; outline: none; opacity: 0.5; transition: opacity 0.3s ease;">
+                <div style="background: var(--bg-base); width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text);"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+            </button>
+        </div>
+
+        <!-- Options Container -->
+        <div class="options" style="margin-bottom: 2.5rem; width: 100%; text-align: left;">
+            <div class="form-row" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div class="form-group" style="width: 100%;">
+                    <label for="custom-slug" style="font-weight: 600; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; color: var(--text-secondary);">Custom Link (optional)</label>
+                    <input type="text" id="custom-slug" placeholder="my-file"
+                           maxlength="32" pattern="[a-zA-Z0-9_\-]+" style="background: transparent; border-bottom: 1px solid var(--border); border-top: none; border-left: none; border-right: none; border-radius: 0; padding: 0.5rem 0; width: 100%; font-size: 1.1rem; color: var(--text); transition: border-color var(--transition);">
+                </div>
+                <div class="form-group" style="width: 100%;">
+                    <label for="max-downloads" style="font-weight: 600; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; color: var(--text-secondary);">Max Downloads</label>
+                    <input type="number" id="max-downloads" value="{{ max_downloads }}"
+                           min="1" max="100" style="background: transparent; border-bottom: 1px solid var(--border); border-top: none; border-left: none; border-right: none; border-radius: 0; padding: 0.5rem 0; width: 100%; font-size: 1.1rem; color: var(--text); transition: border-color var(--transition);">
+                </div>
+            </div>
+        </div>
+
+        <!-- File Preview -->
+        <div class="file-preview" id="file-preview" style="background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 2rem;">
+            <div class="file-type-icon default" id="file-type-icon">FILE</div>
+            <div class="file-details">
+                <div class="file-name" id="file-name"></div>
+                <div class="file-size" id="file-size"></div>
+            </div>
+            <button class="remove-btn" id="remove-file" title="Remove file">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+            </button>
+        </div>
+
+
+
+        <!-- Progress -->
+        <div class="progress-container" id="progress-container" style="margin-bottom: 2rem;">
+            <div class="progress-bar">
+                <div class="fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-text" id="progress-text">Encrypting &amp; uploading…</div>
+        </div>
+
+        <!-- Error -->
+        <div class="error-panel" id="error-panel"></div>
+
+    </div>
+
+    <!-- ── Result Panel ────────────────────────────────────── -->
+    <div class="result-panel" id="result-panel" style="width: 100%;">
+        <div class="result-card" style="background: transparent; border: none; box-shadow: none; padding: 0; text-align: left; width: 100%;">
+            <span class="success-icon" style="color:var(--success); display: inline-flex; margin-bottom: 1rem;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+            </span>
+            <h3 style="font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--text);">Ready to Share</h3>
+            <p style="font-size:1rem;color:var(--text-secondary);margin-bottom:1.5rem;font-weight:500;">
+                This link will self-destruct after expiry.
+            </p>
+            <div class="link-box" style="margin-bottom: 1.5rem; width: 100%;">
+                <input type="text" id="result-link" readonly style="font-size: 1.1rem; padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-input); width: 100%;">
+                <button class="copy-btn" id="copy-btn" style="padding: 1rem 1.5rem; border-radius: var(--radius-sm); font-weight: 600; font-size: 1rem; flex-shrink: 0;">Copy</button>
+            </div>
+            <div class="meta" style="justify-content: flex-start; gap: 2rem; font-size: 0.95rem; color: var(--text-secondary); font-weight: 600;">
+                <span id="result-downloads"><span></span> downloads</span>
+                <span>Expires in 24h</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── My Uploads Panel (logged-in users) ─────────────── -->
+    {% if user_email %}
+    <div class="card tab-content" id="my-uploads-card" data-tab="my-uploads" style="display:none;">
+        <div class="my-uploads-header">
+            <p class="my-uploads-desc">Your recent uploads linked to <strong>{{ user_email }}</strong></p>
+        </div>
+        <div id="uploads-loading" class="uploads-loading">
+            <div class="spinner"></div>
+            <span>Loading your files...</span>
+        </div>
+        <div id="uploads-empty" class="uploads-empty" style="display:none;">
+            <span class="empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></svg>
+            </span>
+            <p>No files yet. Upload something to get started!</p>
+        </div>
+        <div id="uploads-list" class="uploads-list" style="display:none;"></div>
+    </div>
+    {% endif %}
+
+        </div> <!-- /app-container -->
+    </div> <!-- /right-pane -->
+</div> <!-- /split-layout -->
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Auth Modal (Login / Signup / Verify)
+     ═══════════════════════════════════════════════════════════════════════ -->
+{% if cognito_enabled and not user_email %}
+<div class="modal-overlay" id="auth-modal" style="display:none;">
+    <div class="modal-card">
+        <button class="modal-close" onclick="hideAuthModal()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+        </button>
+
+        <!-- Tab Switch: Login / Signup -->
+        <div class="modal-tabs">
+            <button class="modal-tab active" id="tab-login" onclick="switchAuthTab('login')">Login</button>
+            <button class="modal-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <form class="auth-form" id="login-form" onsubmit="return doLogin(event)">
+            <div class="form-group">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" placeholder="Your password" required>
+            </div>
+            <div class="auth-error" id="login-error"></div>
+            <button type="submit" class="upload-btn" id="login-submit-btn">Login to Account</button>
+        </form>
+
+        <!-- Signup Form -->
+        <form class="auth-form" id="signup-form" style="display:none;" onsubmit="return doSignup(event)">
+            <div class="form-group">
+                <label for="signup-email">Email</label>
+                <input type="email" id="signup-email" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="signup-password">Password</label>
+                <input type="password" id="signup-password" placeholder="Min 8 chars, mixed case + number + symbol" required minlength="8">
+            </div>
+            <div class="auth-error" id="signup-error"></div>
+            <button type="submit" class="upload-btn" id="signup-submit-btn">Create Account</button>
+        </form>
+
+        <!-- Verify Form (shows after signup) -->
+        <form class="auth-form" id="verify-form" style="display:none;" onsubmit="return doVerify(event)">
+            <p style="color:var(--text-secondary);font-size:0.95rem;margin-bottom:1.5rem;text-align:center;">
+                A verification code was sent to <br><strong id="verify-email-display" style="color:var(--text);font-size:1.1rem;display:inline-block;margin-top:0.5rem;"></strong>
+            </p>
+            <div class="form-group">
+                <label for="verify-code">Verification Code</label>
+                <input type="text" id="verify-code" placeholder="Enter 6-digit code" required style="text-align:center;letter-spacing:0.2em;font-size:1.2rem;">
+            </div>
+            <div class="auth-error" id="verify-error"></div>
+            <button type="submit" class="upload-btn">Verify Email</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     JavaScript
+     ═══════════════════════════════════════════════════════════════════════ -->
+{% raw %}
+<script>
+(function () {
+    'use strict';
+
+    // ── DOM refs ───────────────────────────────────────────
+    const dropzone       = document.getElementById('dropzone');
+    const fileInput      = document.getElementById('file-input');
+    const filePreview    = document.getElementById('file-preview');
+    const fileName       = document.getElementById('file-name');
+    const fileSize       = document.getElementById('file-size');
+    const removeBtn      = document.getElementById('remove-file');
+    const customSlug     = document.getElementById('custom-slug');
+    const maxDownloads   = document.getElementById('max-downloads');
+    const uploadBtn      = document.getElementById('upload-btn');
+    const progressCont   = document.getElementById('progress-container');
+    const progressFill   = document.getElementById('progress-fill');
+    const progressText   = document.getElementById('progress-text');
+    const errorPanel     = document.getElementById('error-panel');
+    const resultPanel    = document.getElementById('result-panel');
+    const resultLink     = document.getElementById('result-link');
+    const resultDl       = document.querySelector('#result-downloads span');
+    const copyBtn        = document.getElementById('copy-btn');
+
+    let selectedFile = null;
+
+    // ── Toast Notifications ────────────────────────────────
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        let iconSvg = '';
+        if (type === 'success') {
+            iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        } else {
+            iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        }
+        
+        toast.innerHTML = `<span class="toast-icon">${iconSvg}</span> ${message}`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3400);
+    }
+
+    // ── Upload Sound Effect ───────────────────────────────
+    function playSuccessSound() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const notes = [880, 1108.73]; // A5 → C#6
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.4);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(ctx.currentTime + i * 0.12);
+                osc.stop(ctx.currentTime + i * 0.12 + 0.4);
+            });
+        } catch(e) {}
+    }
+
+    // ── File Type Detection ────────────────────────────────
+    function getFileType(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const types = {
+            pdf: { cls: 'pdf', label: 'PDF' },
+            jpg: { cls: 'image', label: 'JPG' }, jpeg: { cls: 'image', label: 'JPG' },
+            png: { cls: 'image', label: 'PNG' }, gif: { cls: 'image', label: 'GIF' },
+            webp: { cls: 'image', label: 'IMG' }, svg: { cls: 'image', label: 'SVG' },
+            mp4: { cls: 'video', label: 'MP4' }, mov: { cls: 'video', label: 'MOV' },
+            avi: { cls: 'video', label: 'AVI' }, mkv: { cls: 'video', label: 'MKV' },
+            mp3: { cls: 'audio', label: 'MP3' }, wav: { cls: 'audio', label: 'WAV' },
+            flac: { cls: 'audio', label: 'FLAC' },
+            zip: { cls: 'zip', label: 'ZIP' }, rar: { cls: 'zip', label: 'RAR' },
+            '7z': { cls: 'zip', label: '7Z' }, tar: { cls: 'zip', label: 'TAR' },
+            gz: { cls: 'zip', label: 'GZ' },
+            js: { cls: 'code', label: 'JS' }, py: { cls: 'code', label: 'PY' },
+            html: { cls: 'code', label: 'HTML' }, css: { cls: 'code', label: 'CSS' },
+            json: { cls: 'code', label: 'JSON' }, java: { cls: 'code', label: 'JAVA' },
+            doc: { cls: 'doc', label: 'DOC' }, docx: { cls: 'doc', label: 'DOCX' },
+            xls: { cls: 'doc', label: 'XLS' }, xlsx: { cls: 'doc', label: 'XLSX' },
+            ppt: { cls: 'doc', label: 'PPT' }, pptx: { cls: 'doc', label: 'PPTX' },
+            txt: { cls: 'doc', label: 'TXT' }, csv: { cls: 'doc', label: 'CSV' },
+        };
+        return types[ext] || { cls: 'default', label: ext ? ext.toUpperCase().slice(0,4) : 'FILE' };
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function showError(msg) {
+        errorPanel.innerHTML = msg;
+        errorPanel.classList.add('visible');
+        setTimeout(() => errorPanel.classList.remove('visible'), 6000);
+    }
+
+    function hideError() { errorPanel.classList.remove('visible'); }
+
+    let selectedFiles = [];
+
+    function setFiles(files) {
+        selectedFiles = Array.from(files);
+        if (selectedFiles.length === 1) {
+            fileName.textContent = selectedFiles[0].name;
+            fileSize.textContent = formatBytes(selectedFiles[0].size);
+            const ft = getFileType(selectedFiles[0].name);
+            const icon = document.getElementById('file-type-icon');
+            icon.className = `file-type-icon ${ft.cls}`;
+            icon.textContent = ft.label;
+        } else {
+            fileName.textContent = `${selectedFiles.length} files selected`;
+            let totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+            fileSize.textContent = formatBytes(totalSize) + ' total';
+            const icon = document.getElementById('file-type-icon');
+            icon.className = `file-type-icon zip`;
+            icon.textContent = 'ZIP';
+        }
+        filePreview.classList.add('visible');
+        uploadBtn.disabled = false;
+        uploadBtn.style.opacity = '1';
+        hideError();
+    }
+
+    function clearFile() {
+        selectedFiles = [];
+        fileInput.value = '';
+        filePreview.classList.remove('visible');
+        uploadBtn.disabled = true;
+        uploadBtn.style.opacity = '0.5';
+    }
+
+    // ── Drag & Drop ───────────────────────────────────────
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => { dropzone.classList.remove('dragover'); });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault(); dropzone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) setFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) setFiles(fileInput.files); });
+    removeBtn.addEventListener('click', clearFile);
+
+    // ── Upload ────────────────────────────────────────────
+    uploadBtn.addEventListener('click', async () => {
+        if (selectedFiles.length === 0) return;
+        hideError();
+        resultPanel.classList.remove('visible');
+        uploadBtn.disabled = true;
+        uploadBtn.style.opacity = '0.5';
+        progressCont.classList.add('visible');
+        progressFill.style.width = '0%';
+        progressText.textContent = 'Encrypting & uploading…';
+
+        let pct = 0;
+        const iv = setInterval(() => {
+            pct = Math.min(pct + Math.random() * 15, 90);
+            progressFill.style.width = pct + '%';
+        }, 300);
+
+        const fd = new FormData();
+        selectedFiles.forEach(f => fd.append('files', f));
+        fd.append('custom_slug', customSlug.value.trim());
+        fd.append('max_downloads', maxDownloads.value);
+
+        try {
+            const resp = await fetch('/upload', { method: 'POST', body: fd });
+            clearInterval(iv);
+            if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Upload failed.'); }
+            const data = await resp.json();
+            progressFill.style.width = '100%';
+            progressText.textContent = 'Upload Complete!';
+            setTimeout(() => {
+                progressCont.classList.remove('visible');
+                resultLink.value = data.download_url;
+                resultDl.textContent = data.max_downloads;
+                resultPanel.classList.add('visible');
+                playSuccessSound();
+                showToast('File uploaded successfully!');
+                clearFile(); // Reset file input after success
+                if (window.innerWidth < 768) {
+                    resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 600);
+        } catch (err) {
+            clearInterval(iv);
+            progressCont.classList.remove('visible');
+            showError(err.message);
+            uploadBtn.disabled = false;
+        }
+    });
+
+    // ── Copy Link ─────────────────────────────────────────
+    copyBtn.addEventListener('click', () => {
+        resultLink.select();
+        navigator.clipboard.writeText(resultLink.value).then(() => {
+            showToast('Link copied to clipboard!');
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+        });
+    });
+
+    // ── Tab Navigation ────────────────────────────────────
+    const tabNav = document.getElementById('tab-nav');
+    if (tabNav) {
+        const tabBtns = tabNav.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                tabContents.forEach(c => {
+                    c.style.display = c.dataset.tab === tab ? '' : 'none';
+                    if (c.dataset.tab === tab && tab === 'my-uploads') loadMyUploads();
+                });
+                resultPanel.classList.remove('visible');
+            });
+        });
+    }
+
+    // ── My Uploads ────────────────────────────────────────
+    async function loadMyUploads() {
+        const loading = document.getElementById('uploads-loading');
+        const empty = document.getElementById('uploads-empty');
+        const list = document.getElementById('uploads-list');
+        if (!loading) return;
+        loading.style.display = 'flex'; empty.style.display = 'none'; list.style.display = 'none';
+        try {
+            const resp = await fetch('/api/my-uploads');
+            if (!resp.ok) throw new Error();
+            const data = await resp.json();
+            loading.style.display = 'none';
+            if (!data.uploads || data.uploads.length === 0) { empty.style.display = 'flex'; return; }
+            list.innerHTML = data.uploads.map(u => `
+                <div class="upload-item ${u.active ? '' : 'expired'}">
+                    <div class="upload-info">
+                        <span class="upload-filename">${esc(u.filename)}</span>
+                        <span class="upload-status">
+                            ${u.active
+                                ? `<span class="status-badge active">Active</span> · ${u.downloads_left}/${u.max_downloads} left`
+                                : `<span class="status-badge expired">Expired</span>`}
+                        </span>
+                    </div>
+                    ${u.active ? `<button class="copy-link-btn" onclick="cpLink('${data.base_url}/d/${u.short_id}',this)">Copy Link</button>` : ''}
+                </div>
+            `).join('');
+            list.style.display = 'flex';
+        } catch { loading.style.display = 'none'; empty.style.display = 'flex'; }
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    window.cpLink = (url, btn) => {
+        navigator.clipboard.writeText(url).then(() => {
+            showToast('Link copied to clipboard!');
+            btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy Link', 2000);
+        });
+    };
+
+    // ── Theme Toggle ──────────────────────────────────────
+    const themeToggle = document.getElementById('theme-toggle');
+    const moonIcon = document.getElementById('theme-icon-moon');
+    const sunIcon = document.getElementById('theme-icon-sun');
+    const savedTheme = localStorage.getItem('tempshare-theme') || 'dark'; // Default to dark for premium look
+    
+    // Apply initial theme
+    if (savedTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        moonIcon.style.display = 'none'; sunIcon.style.display = 'block';
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        sunIcon.style.display = 'none'; moonIcon.style.display = 'block';
+    }
+    
+    themeToggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        if (current === 'dark') {
+            document.documentElement.removeAttribute('data-theme');
+            sunIcon.style.display = 'none'; moonIcon.style.display = 'block';
+            localStorage.setItem('tempshare-theme', 'light');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            sunIcon.style.display = 'block'; moonIcon.style.display = 'none';
+            localStorage.setItem('tempshare-theme', 'dark');
+        }
+    });
+
+    // ═══════════════════════════════════════════════════════
+    //  AUTH MODAL
+    // ═══════════════════════════════════════════════════════
+
+    let pendingEmail = '';
+
+    window.showAuthModal = () => {
+        const m = document.getElementById('auth-modal');
+        if (m) m.style.display = 'flex';
+    };
+
+    window.hideAuthModal = () => {
+        const m = document.getElementById('auth-modal');
+        if (m) m.style.display = 'none';
+    };
+
+    window.switchAuthTab = (tab) => {
+        document.getElementById('login-form').style.display = tab === 'login' ? '' : 'none';
+        document.getElementById('signup-form').style.display = tab === 'signup' ? '' : 'none';
+        document.getElementById('verify-form').style.display = 'none';
+        document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+        document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+        clearAuthErrors();
+    };
+
+    function clearAuthErrors() {
+        ['login-error', 'signup-error', 'verify-error'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.innerHTML = ''; el.style.display = 'none'; }
+        });
+    }
+
+    function showAuthError(id, msg) {
+        const el = document.getElementById(id);
+        if (el) { el.innerHTML = msg; el.style.display = 'flex'; }
+    }
+
+    window.doLogin = async (e) => {
+        e.preventDefault();
+        clearAuthErrors();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const btn = document.getElementById('login-submit-btn');
+        btn.disabled = true; btn.textContent = 'Logging in...';
+        try {
+            const resp = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+            if (resp.status === 403) {
+                pendingEmail = email;
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('verify-form').style.display = '';
+                document.getElementById('verify-email-display').textContent = email;
+                btn.disabled = false; btn.textContent = 'Login to Account';
+                return false;
+            }
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Login failed.');
+            }
+            window.location.reload();
+        } catch (err) {
+            showAuthError('login-error', err.message);
+            btn.disabled = false; btn.textContent = 'Login to Account';
+        }
+        return false;
+    };
+
+    window.doSignup = async (e) => {
+        e.preventDefault();
+        clearAuthErrors();
+        const email = document.getElementById('signup-email').value;
+        const password = document.getElementById('signup-password').value;
+        const btn = document.getElementById('signup-submit-btn');
+        btn.disabled = true; btn.textContent = 'Creating account...';
+        try {
+            const resp = await fetch('/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Signup failed.');
+            }
+            pendingEmail = email;
+            document.getElementById('signup-form').style.display = 'none';
+            document.getElementById('verify-form').style.display = '';
+            document.getElementById('verify-email-display').textContent = email;
+        } catch (err) {
+            showAuthError('signup-error', err.message);
+        }
+        btn.disabled = false; btn.textContent = 'Create Account';
+        return false;
+    };
+
+    window.doVerify = async (e) => {
+        e.preventDefault();
+        clearAuthErrors();
+        const code = document.getElementById('verify-code').value;
+        try {
+            const resp = await fetch('/auth/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: pendingEmail, code }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Verification failed.');
+            }
+            document.getElementById('verify-form').style.display = 'none';
+            document.getElementById('login-form').style.display = '';
+            document.getElementById('login-email').value = pendingEmail;
+            document.getElementById('tab-login').classList.add('active');
+            document.getElementById('tab-signup').classList.remove('active');
+            showAuthError('login-error', '');
+            const el = document.getElementById('login-error');
+            el.innerHTML = 'Email verified! Enter your password to login.';
+            el.style.display = 'flex';
+            el.style.color = 'var(--success)';
+            el.style.borderColor = 'rgba(16,185,129,0.3)';
+            el.style.backgroundColor = 'var(--success-bg)';
+        } catch (err) {
+            showAuthError('verify-error', err.message);
+        }
+        return false;
+    };
+
+    window.doLogout = async () => {
+        await fetch('/auth/logout', { method: 'POST' });
+        window.location.reload();
+    };
+
+})();
+</script>
+{% endraw %}
+
+</body>
+</html>
