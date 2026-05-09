@@ -46,4 +46,5 @@ Thumbs.db
 clouddrop-app.zip
 /tmp/
 logs/
-aws_deployment_guide
+aws_deployment_guide.md
+deploy_userdata.sh
